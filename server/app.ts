@@ -3,7 +3,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { resolve, sep, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { demoExercise, demoReference, parseNumericAnswer, reviewAttempt } from './exercises.ts';
+import { checkNumericAnswer, reviewAttempt } from './exercises.ts';
+import { exerciseBank, getExercise, publicExercise } from './exercise-bank.ts';
 
 const distDirectory = fileURLToPath(new URL('../dist/', import.meta.url));
 const mimeTypes: Record<string, string> = {
@@ -49,33 +50,41 @@ export function createApp() {
     try {
       const pathname = new URL(request.url ?? '/', 'http://localhost').pathname;
       if (request.method === 'GET' && pathname === '/api/health') {
-        json(response, 200, { status: 'ok', mode: 'demo', exerciseCount: 1, explanationAssessment: 'not_evaluated' });
+        json(response, 200, { status: 'ok', mode: 'demo', exerciseCount: exerciseBank.length, explanationAssessment: 'not_evaluated' });
         return;
       }
-      if (request.method === 'GET' && pathname === '/api/exercises/demo') {
-        json(response, 200, demoExercise);
+      if (request.method === 'GET' && pathname === '/api/exercises') {
+        json(response, 200, exerciseBank.map(publicExercise));
+        return;
+      }
+      if (request.method === 'GET' && pathname.startsWith('/api/exercises/')) {
+        const id = decodeURIComponent(pathname.slice('/api/exercises/'.length));
+        const exercise = getExercise(id === 'demo' ? 'discount-then-markup-01' : id);
+        if (!exercise) throw new RequestError(404, 'Задача не найдена.');
+        json(response, 200, publicExercise(exercise));
         return;
       }
       if (request.method === 'POST' && (pathname === '/api/review' || pathname === '/api/practice')) {
         const body = await readBody(request);
-        if (body.exerciseId !== demoExercise.id) throw new RequestError(404, 'Задача не найдена.');
+        const exercise = getExercise(body.exerciseId);
+        if (!exercise) throw new RequestError(404, 'Задача не найдена.');
         if (pathname === '/api/review') {
-          if (!Number.isInteger(body.selectedStep) || !demoExercise.steps.some(step => step.number === body.selectedStep)) {
+          if (!Number.isInteger(body.selectedStep) || !exercise.steps.some(step => step.number === body.selectedStep)) {
             throw new RequestError(400, 'Выберите шаг решения.');
           }
           if (typeof body.explanation !== 'string' || body.explanation.trim().length < 10 || body.explanation.length > 2_000) {
             throw new RequestError(400, 'Напишите объяснение длиной от 10 до 2 000 символов.');
           }
           // На первом этапе смысл объяснения не оценивается. Не имитируем ответ ИИ.
-          json(response, 200, reviewAttempt(body.selectedStep as number));
+          json(response, 200, reviewAttempt(exercise, body.selectedStep as number));
         } else {
           if (typeof body.answer !== 'string' || body.answer.length > 100) throw new RequestError(400, 'Введите числовой ответ.');
-          const answer = parseNumericAnswer(body.answer);
-          if (answer === null) throw new RequestError(400, 'Введите число, например 990 или 990,00.');
+          const correct = checkNumericAnswer(body.answer, exercise.practice.answer, exercise.practice.unit);
+          if (correct === null) throw new RequestError(400, `Введите число, например 100 или 100,00. Единица ответа: ${exercise.practice.unit}.`);
           json(response, 200, {
-            correct: answer === demoReference.practice.answer,
-            expectedAnswer: demoReference.practice.answer,
-            explanation: demoReference.practice.explanation,
+            correct,
+            expectedAnswer: exercise.practice.answer,
+            explanation: exercise.practice.explanation,
           });
         }
         return;
