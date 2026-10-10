@@ -8,10 +8,26 @@ export interface Exercise {
   hints: [string, string];
 }
 
-export interface Review {
+export type ExplanationAssessment = 'correct' | 'partial' | 'incorrect' | 'not_evaluated';
+export type ExplanationIssue = 'not_configured' | 'timeout' | 'unavailable' | 'invalid_response' | 'refused' | 'busy';
+export interface RubricResult { criterion: string; met: boolean; evidence: string }
+
+export interface ExplanationEvaluation {
+  explanationAssessment: ExplanationAssessment;
+  explanationFeedback: string;
+  rubricResults: RubricResult[];
+  explanationIssue: ExplanationIssue | null;
+}
+
+export interface Health {
+  status: 'ok';
+  mode: 'model' | 'reference_only';
+  exerciseCount: number;
+}
+
+export interface Review extends ExplanationEvaluation {
   selectedStepCorrect: boolean;
   firstWrongStep: number;
-  explanationAssessment: 'not_evaluated';
   feedback: string;
   referenceExplanation: string;
   correctSteps: string[];
@@ -33,7 +49,10 @@ export interface Attempt {
   selectedStep: number;
   explanation: string;
   selectedStepCorrect: boolean;
-  explanationAssessment: 'not_evaluated';
+  explanationAssessment: ExplanationAssessment;
+  explanationFeedback?: string;
+  rubricResults?: RubricResult[];
+  explanationIssue?: ExplanationIssue | null;
   practiceAnswer: string;
   practiceCorrect: boolean;
 }
