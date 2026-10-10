@@ -1,12 +1,13 @@
 import type { Review } from '../shared/types.ts';
 import type { ExerciseRecord } from './exercise-bank.ts';
+import { unevaluated } from './explanation-evaluator.ts';
 
 export function reviewAttempt(exercise: ExerciseRecord, selectedStep: number): Review {
   const selectedStepCorrect = selectedStep === exercise.firstWrongStep;
   return {
     selectedStepCorrect,
     firstWrongStep: exercise.firstWrongStep,
-    explanationAssessment: 'not_evaluated',
+    ...unevaluated('not_configured'),
     feedback: selectedStepCorrect
       ? 'Ты нашёл первый неверный шаг! Теперь сравни своё объяснение с разбором.'
       : selectedStep < exercise.firstWrongStep

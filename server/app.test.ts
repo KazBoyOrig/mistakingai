@@ -5,6 +5,7 @@ import { createApp } from './app.ts';
 import { exerciseBank, validateBank, calculate, getExercise } from './exercise-bank.ts';
 import type { ExerciseRecord } from './exercise-bank.ts';
 import { checkNumericAnswer, parseNumericAnswer, reviewAttempt } from './exercises.ts';
+import { createExplanationEvaluator } from './explanation-evaluator.ts';
 
 // Независимые контрольные ответы: значения не выводятся из текста или из correctAnswer банка.
 const golden: [string, number, number, number][] = [
@@ -83,7 +84,7 @@ test('числовая проверка учитывает единицы и з�
 });
 
 test('API: все 15 задач, ответы и подсказки без утечки эталонов', async t => {
-  const server = createApp();
+  const server = createApp(createExplanationEvaluator({ apiKey: '' }));
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   t.after(() => new Promise<void>((resolve, reject) => {
     server.close(error => error ? reject(error) : resolve());

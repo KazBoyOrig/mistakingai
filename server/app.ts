@@ -5,6 +5,8 @@ import { resolve, sep, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkNumericAnswer, reviewAttempt } from './exercises.ts';
 import { exerciseBank, getExercise, publicExercise } from './exercise-bank.ts';
+import { createExplanationEvaluator } from './explanation-evaluator.ts';
+import type { ExplanationEvaluator } from './explanation-evaluator.ts';
 
 const distDirectory = fileURLToPath(new URL('../dist/', import.meta.url));
 const mimeTypes: Record<string, string> = {
@@ -45,12 +47,12 @@ async function readBody(request: IncomingMessage): Promise<Record<string, unknow
   }
 }
 
-export function createApp() {
+export function createApp(evaluator: ExplanationEvaluator = createExplanationEvaluator()) {
   return createServer(async (request, response) => {
     try {
       const pathname = new URL(request.url ?? '/', 'http://localhost').pathname;
       if (request.method === 'GET' && pathname === '/api/health') {
-        json(response, 200, { status: 'ok', mode: 'demo', exerciseCount: exerciseBank.length, explanationAssessment: 'not_evaluated' });
+        json(response, 200, { status: 'ok', mode: evaluator.configured ? 'model' : 'reference_only', exerciseCount: exerciseBank.length });
         return;
       }
       if (request.method === 'GET' && pathname === '/api/exercises') {
@@ -75,8 +77,9 @@ export function createApp() {
           if (typeof body.explanation !== 'string' || body.explanation.trim().length < 10 || body.explanation.length > 2_000) {
             throw new RequestError(400, 'Напишите объяснение длиной от 10 до 2 000 символов.');
           }
-          // На первом этапе смысл объяснения не оценивается. Не имитируем ответ ИИ.
-          json(response, 200, reviewAttempt(exercise, body.selectedStep as number));
+          const review = reviewAttempt(exercise, body.selectedStep as number);
+          const evaluation = await evaluator.evaluate(exercise, body.explanation.trim());
+          json(response, 200, { ...review, ...evaluation });
         } else {
           if (typeof body.answer !== 'string' || body.answer.length > 100) throw new RequestError(400, 'Введите числовой ответ.');
           const correct = checkNumericAnswer(body.answer, exercise.practice.answer, exercise.practice.unit);
