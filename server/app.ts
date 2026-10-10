@@ -3,7 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { resolve, sep, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { checkNumericAnswer, reviewAttempt } from './exercises.ts';
+import { checkNumericAnswer, exerciseSolution, reviewAttempt } from './exercises.ts';
 import { exerciseBank, getExercise, publicExercise } from './exercise-bank.ts';
 import { createExplanationEvaluator } from './explanation-evaluator.ts';
 import type { ExplanationEvaluator } from './explanation-evaluator.ts';
@@ -59,6 +59,12 @@ export function createApp(evaluator: ExplanationEvaluator = createExplanationEva
         json(response, 200, exerciseBank.map(publicExercise));
         return;
       }
+      if (request.method === 'GET' && pathname.startsWith('/api/solutions/')) {
+        const exercise = getExercise(decodeURIComponent(pathname.slice('/api/solutions/'.length)));
+        if (!exercise) throw new RequestError(404, 'Задача не найдена.');
+        json(response, 200, exerciseSolution(exercise));
+        return;
+      }
       if (request.method === 'GET' && pathname.startsWith('/api/exercises/')) {
         const id = decodeURIComponent(pathname.slice('/api/exercises/'.length));
         const exercise = getExercise(id === 'demo' ? 'discount-then-markup-01' : id);
@@ -83,7 +89,7 @@ export function createApp(evaluator: ExplanationEvaluator = createExplanationEva
         } else {
           if (typeof body.answer !== 'string' || body.answer.length > 100) throw new RequestError(400, 'Введите числовой ответ.');
           const correct = checkNumericAnswer(body.answer, exercise.practice.answer, exercise.practice.unit);
-          if (correct === null) throw new RequestError(400, `Введите число, например 100 или 100,00. Единица ответа: ${exercise.practice.unit}.`);
+          if (correct === null) throw new RequestError(400, `Введите число без формулы. Единица ответа: ${exercise.practice.unit} (например, 100,00 ${exercise.practice.unit}).`);
           json(response, 200, {
             correct,
             expectedAnswer: exercise.practice.answer,

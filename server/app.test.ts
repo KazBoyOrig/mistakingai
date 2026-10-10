@@ -69,16 +69,24 @@ test('валидатор отклоняет повреждённую струк�
 });
 
 test('числовая проверка учитывает единицы и запрещает формулы', () => {
-  for (const value of ['990', '990,00', '990.0', ' 990 ₽ ', '9\u00a090 ₽']) {
+  for (const value of ['990', '990,00', '990.0', ' 990 ₽ ', '9\u00a090 ₽', '990рублей', '990 руб.', '990 РУБ', '990 р.']) {
     assert.equal(parseNumericAnswer(value), 990);
     assert.equal(checkNumericAnswer(value, 990, '₽'), true);
   }
   assert.equal(checkNumericAnswer('12 п.п.', 12, 'п.п.'), true);
+  assert.equal(checkNumericAnswer('12 процентных пунктов', 12, 'п.п.'), true);
+  assert.equal(checkNumericAnswer('12 П. П.', 12, 'п.п.'), true);
+  assert.equal(checkNumericAnswer('12 п.п', 12, 'п.п.'), true);
   assert.equal(checkNumericAnswer('25%', 25, '%'), true);
+  assert.equal(checkNumericAnswer('25 процентов', 25, '%'), true);
+  assert.equal(checkNumericAnswer('1\u202f000,50 рублей', 1000.5, '₽'), true);
+  assert.equal(checkNumericAnswer('0,3 процента', 0.1 + 0.2, '%'), true);
   assert.equal(checkNumericAnswer('12%', 12, 'п.п.'), null);
   assert.equal(checkNumericAnswer('990%', 990, '₽'), null);
   assert.equal(checkNumericAnswer('990,01', 990, '₽'), false);
-  for (const value of ['', ' ', '990рублей', '900*1.1', '990abc', 'Infinity', '-990', '0x3de', '990,0,0']) {
+  assert.equal(checkNumericAnswer('12 процентов', 12, 'п.п.'), null);
+  assert.equal(checkNumericAnswer('990 долларов', 990, '₽'), null);
+  for (const value of ['', ' ', '900*1.1', '990abc', 'Infinity', '-990', '0x3de', '990,0,0', '990constructor', '9.90.0', '25%%']) {
     assert.equal(parseNumericAnswer(value), null);
   }
 });
@@ -118,10 +126,18 @@ test('API: все 15 задач, ответы и подсказки без ут�
     assert.equal(reviewed.status, 200);
     const review = await reviewed.json();
     assert.equal(review.selectedStepCorrect, true);
-    assert.equal(review.correctAnswer, answer);
-    assert.equal(review.answerUnit, task.answerUnit);
     assert.equal(review.explanationAssessment, 'not_evaluated');
-    assert.equal(review.practice.answer, undefined);
+    for (const hidden of ['firstWrongStep', 'correctSteps', 'correctAnswer', 'referenceExplanation', 'practice']) assert.equal(review[hidden], undefined);
+    const solution = await (await fetch(base + '/api/solutions/' + id)).json();
+    assert.equal(solution.firstWrongStep, firstWrongStep);
+    assert.equal(solution.correctAnswer, answer);
+    assert.equal(solution.answerUnit, task.answerUnit);
+    assert.deepEqual(solution.correctSteps, task.correctSteps);
+    assert.equal(solution.practice.answer, undefined);
+    const wrongReview = await (await post('/api/review', { exerciseId: id, selectedStep: firstWrongStep - 1, explanation: 'Объяснение своими словами для проверки маршрута.' })).json();
+    assert.equal(wrongReview.selectedStepCorrect, false);
+    assert.match(wrongReview.feedback, /Попробуй снова/);
+    assert.equal(wrongReview.firstWrongStep, undefined);
     const valid = await post('/api/practice', { exerciseId: id, answer: practiceAnswer + ' ' + task.practice.unit });
     assert.equal(valid.status, 200);
     assert.equal((await valid.json()).correct, true);
@@ -132,6 +148,7 @@ test('API: все 15 задач, ответы и подсказки без ут�
   const demoId = golden[0][0];
   assert.equal((await fetch(base + '/api/exercises/demo')).status, 200);
   assert.equal((await fetch(base + '/api/exercises/missing')).status, 404);
+  assert.equal((await fetch(base + '/api/solutions/missing')).status, 404);
   for (const selectedStep of [0, 5, 2.5, '3', null]) {
     assert.equal((await post('/api/review', { exerciseId: demoId, selectedStep, explanation: 'Достаточно длинное объяснение' })).status, 400);
   }

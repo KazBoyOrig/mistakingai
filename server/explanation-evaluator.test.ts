@@ -150,10 +150,13 @@ test('API: оценка объяснения независима от шага,
   nextResponse = { status: 'incomplete', output: [] };
   const unavailable = await review(3);
   assert.equal(unavailable.explanationAssessment, 'not_evaluated');
-  assert.equal(unavailable.firstWrongStep, 3);
-  assert.equal(unavailable.correctAnswer, 1920);
-  assert.deepEqual(unavailable.correctSteps, exercise.correctSteps);
-  assert.equal(unavailable.practice.answer, undefined);
+  assert.equal(unavailable.firstWrongStep, undefined);
+  assert.equal(unavailable.correctSteps, undefined);
+  const solution = await (await fetch(base + '/api/solutions/' + exercise.id)).json();
+  assert.equal(solution.firstWrongStep, 3);
+  assert.equal(solution.correctAnswer, 1920);
+  assert.deepEqual(solution.correctSteps, exercise.correctSteps);
+  assert.equal(solution.practice.answer, undefined);
 });
 
 test('парсер допускает полезные дополнительные поля оболочки API', async () => {
