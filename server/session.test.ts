@@ -48,7 +48,7 @@ test('повреждённый или противоречивый экран о
     { ...reviewed, selectedStep: null }, { ...reviewed, activeAttemptId: null },
     { ...draft, solution: exerciseSolution(exercise) },
     { ...reviewed, practiceResult: { correct: true, expectedAnswer: 990, explanation: 'Верно' } },
-    { ...reviewed, review: { ...reviewed.review, explanationAssessment: 'correct' } },
+    { ...reviewed, review: { ...reviewed.review, verdict: 'correct' } },
     { ...draft, unrecognizedVersion: true },
   ];
   for (const value of invalid) {
@@ -67,4 +67,38 @@ test('при заблокированном localStorage игра не пада�
   t.after(() => { if (original) Object.defineProperty(globalThis, 'localStorage', original); else Reflect.deleteProperty(globalThis, 'localStorage'); });
   assert.equal(saveSession(draft), false);
   assert.ok(loadSession().error);
+});
+
+test('четыре вердикта и уточняющий вопрос восстанавливаются без повторной оценки', t => {
+  storage(t);
+  for (const verdict of ['correct', 'partial', 'incorrect', 'unclear'] as const) {
+    const session: GameSession = { ...draft, review: { ...reviewAttempt(exercise, 3), selectedStepCorrect: true,
+      verdict, feedback: 'Короткая обратная связь.', explanationIssue: null,
+      followUpQuestion: ['partial', 'unclear'].includes(verdict) ? 'От какой суммы берут наценку?' : null,
+    }, activeAttemptId: 'test-' + verdict };
+    assert.equal(saveSession(session), true);
+    assert.deepEqual(loadSession().session, session);
+  }
+});
+
+test('прежний экран с оценкой по рубрике мигрирует, не теряя разбор и результат', t => {
+  const values = storage(t);
+  for (const explanationAssessment of ['correct', 'partial', 'incorrect', 'not_evaluated'] as const) {
+    values.set('mistakingai.session.v1', JSON.stringify({ ...draft,
+      activeAttemptId: 'legacy', solution: exerciseSolution(exercise), answer: '990',
+      practiceResult: { correct: true, expectedAnswer: 990, explanation: 'Верно' },
+      review: { selectedStepCorrect: false, feedback: 'Попробуй снова.', explanationAssessment,
+        explanationFeedback: 'Сравни базы.', explanationIssue: explanationAssessment === 'not_evaluated' ? 'not_configured' : null,
+        rubricResults: explanationAssessment === 'not_evaluated' ? [] : [{ criterion: 'Базы', met: true, evidence: 'Верно' }],
+      },
+    }));
+    const restored = loadSession();
+    assert.equal(restored.error, null);
+    assert.equal(restored.session!.review!.verdict, explanationAssessment === 'not_evaluated' ? null : explanationAssessment);
+    assert.equal(restored.session!.review!.stepFeedback, 'Попробуй снова.');
+    assert.equal(restored.session!.practiceResult!.correct, true);
+    assert.equal(restored.session!.solution!.correctAnswer, 1920);
+    assert.equal(saveSession(restored.session!), true);
+    assert.deepEqual(loadSession().session, restored.session);
+  }
 });

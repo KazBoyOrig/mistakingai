@@ -7,7 +7,7 @@ export function reviewAttempt(exercise: ExerciseRecord, selectedStep: number): R
   return {
     selectedStepCorrect,
     ...unevaluated('not_configured'),
-    feedback: selectedStepCorrect
+    stepFeedback: selectedStepCorrect
       ? 'Ты нашёл первый неверный шаг! Открой разбор, когда будешь готов.'
       : selectedStep < exercise.firstWrongStep
         ? 'Выбранный шаг верен. Попробуй снова или открой подсказку.'

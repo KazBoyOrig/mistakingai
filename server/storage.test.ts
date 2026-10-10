@@ -25,6 +25,18 @@ test('прогресс: старые попытки читаются, новая
     assert.equal(saveAttempts([oldAttempt, attempt]), true);
     assert.deepEqual(loadAttempts(), { attempts: [oldAttempt, attempt], error: null });
   }
+  for (const explanationAssessment of ['correct', 'partial', 'incorrect', 'unclear', 'not_evaluated'] as const) {
+    const attempt: Attempt = { ...oldAttempt, id: explanationAssessment, explanationAssessment,
+      explanationFeedback: 'Короткая обратная связь.', explanationIssue: explanationAssessment === 'not_evaluated' ? 'timeout' : null,
+      followUpQuestion: ['partial', 'unclear'].includes(explanationAssessment) ? 'От какой цены считаем наценку?' : null,
+    };
+    assert.equal(saveAttempts([oldAttempt, attempt]), true);
+    assert.deepEqual(loadAttempts(), { attempts: [oldAttempt, attempt], error: null });
+  }
+  const migratedPartial: Attempt = { ...oldAttempt, explanationAssessment: 'partial', explanationFeedback: 'Прежняя оценка.',
+    followUpQuestion: null, explanationIssue: null };
+  assert.equal(saveAttempts([oldAttempt, migratedPartial]), true);
+  assert.deepEqual(loadAttempts(), { attempts: [oldAttempt, migratedPartial], error: null });
   stored = JSON.stringify([{ ...oldAttempt, explanationAssessment: 'correct' }]);
   assert.ok(loadAttempts().error);
   stored = '{broken';

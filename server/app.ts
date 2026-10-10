@@ -80,11 +80,11 @@ export function createApp(evaluator: ExplanationEvaluator = createExplanationEva
           if (!Number.isInteger(body.selectedStep) || !exercise.steps.some(step => step.number === body.selectedStep)) {
             throw new RequestError(400, 'Выберите шаг решения.');
           }
-          if (typeof body.explanation !== 'string' || body.explanation.trim().length < 10 || body.explanation.length > 2_000) {
-            throw new RequestError(400, 'Напишите объяснение длиной от 10 до 2 000 символов.');
+          if (typeof body.explanation !== 'string' || !body.explanation.trim() || body.explanation.length > 2_000) {
+            throw new RequestError(400, 'Напишите непустое объяснение длиной до 2 000 символов. Короткий ответ допустим.');
           }
           const review = reviewAttempt(exercise, body.selectedStep as number);
-          const evaluation = await evaluator.evaluate(exercise, body.explanation.trim());
+          const evaluation = await evaluator.evaluate(exercise, body.selectedStep as number, body.explanation.trim());
           json(response, 200, { ...review, ...evaluation });
         } else {
           if (typeof body.answer !== 'string' || body.answer.length > 100) throw new RequestError(400, 'Введите числовой ответ.');

@@ -37,7 +37,7 @@ for (const [id, answer, practiceAnswer, firstWrongStep] of golden) {
     assert.equal(exercise.firstWrongStep, firstWrongStep);
     assert.equal(reviewAttempt(exercise, firstWrongStep).selectedStepCorrect, true);
     assert.equal(reviewAttempt(exercise, firstWrongStep - 1).selectedStepCorrect, false);
-    assert.match(reviewAttempt(exercise, firstWrongStep + 1).feedback, /раньше/);
+    assert.match(reviewAttempt(exercise, firstWrongStep + 1).stepFeedback, /раньше/);
   });
 }
 
@@ -126,7 +126,7 @@ test('API: все 15 задач, ответы и подсказки без ут�
     assert.equal(reviewed.status, 200);
     const review = await reviewed.json();
     assert.equal(review.selectedStepCorrect, true);
-    assert.equal(review.explanationAssessment, 'not_evaluated');
+    assert.equal(review.verdict, null);
     for (const hidden of ['firstWrongStep', 'correctSteps', 'correctAnswer', 'referenceExplanation', 'practice']) assert.equal(review[hidden], undefined);
     const solution = await (await fetch(base + '/api/solutions/' + id)).json();
     assert.equal(solution.firstWrongStep, firstWrongStep);
@@ -136,7 +136,7 @@ test('API: все 15 задач, ответы и подсказки без ут�
     assert.equal(solution.practice.answer, undefined);
     const wrongReview = await (await post('/api/review', { exerciseId: id, selectedStep: firstWrongStep - 1, explanation: 'Объяснение своими словами для проверки маршрута.' })).json();
     assert.equal(wrongReview.selectedStepCorrect, false);
-    assert.match(wrongReview.feedback, /Попробуй снова/);
+    assert.match(wrongReview.stepFeedback, /Попробуй снова/);
     assert.equal(wrongReview.firstWrongStep, undefined);
     const valid = await post('/api/practice', { exerciseId: id, answer: practiceAnswer + ' ' + task.practice.unit });
     assert.equal(valid.status, 200);
