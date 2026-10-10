@@ -14,7 +14,8 @@
     "build": "npm run typecheck && vite build",
     "start": "tsx server/index.ts",
     "test": "node --import tsx --test server/*.test.ts",
-    "check": "npm run test && npm run build"
+    "check": "npm run test && npm run build",
+    "eval:model": "tsx server/evaluate-model.ts"
   },
   "dependencies": {
     "react": "^19.3.0",
