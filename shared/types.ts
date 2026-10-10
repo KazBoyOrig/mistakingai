@@ -72,4 +72,5 @@ export interface GameSession {
   answer: string;
   practiceResult: PracticeResult | null;
   activeAttemptId: string | null;
+  clarificationQuestion?: string | null;
 }
