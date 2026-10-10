@@ -8,14 +8,15 @@ export interface Exercise {
   hints: [string, string];
 }
 
-export type ExplanationAssessment = 'correct' | 'partial' | 'incorrect' | 'not_evaluated';
+export type ExplanationVerdict = 'correct' | 'partial' | 'incorrect' | 'unclear';
+export type ExplanationAssessment = ExplanationVerdict | 'not_evaluated';
 export type ExplanationIssue = 'not_configured' | 'timeout' | 'unavailable' | 'invalid_response' | 'refused' | 'busy';
 export interface RubricResult { criterion: string; met: boolean; evidence: string }
 
 export interface ExplanationEvaluation {
-  explanationAssessment: ExplanationAssessment;
-  explanationFeedback: string;
-  rubricResults: RubricResult[];
+  verdict: ExplanationVerdict | null;
+  feedback: string;
+  followUpQuestion: string | null;
   explanationIssue: ExplanationIssue | null;
 }
 
@@ -27,7 +28,7 @@ export interface Health {
 
 export interface Review extends ExplanationEvaluation {
   selectedStepCorrect: boolean;
-  feedback: string;
+  stepFeedback: string;
 }
 
 export interface Solution {
@@ -54,6 +55,7 @@ export interface Attempt {
   selectedStepCorrect: boolean;
   explanationAssessment: ExplanationAssessment;
   explanationFeedback?: string;
+  followUpQuestion?: string | null;
   rubricResults?: RubricResult[];
   explanationIssue?: ExplanationIssue | null;
   practiceAnswer: string;
