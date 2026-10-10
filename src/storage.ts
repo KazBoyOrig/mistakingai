@@ -28,7 +28,8 @@ function isAttempt(value: unknown): value is Attempt {
     && typeof attempt.createdAt === 'string' && Number.isFinite(Date.parse(attempt.createdAt))
     && Number.isInteger(attempt.selectedStep) && typeof attempt.explanation === 'string'
     && typeof attempt.selectedStepCorrect === 'boolean' && typeof attempt.practiceAnswer === 'string'
-    && typeof attempt.practiceCorrect === 'boolean' && validEvaluation(attempt);
+    && (typeof attempt.practiceCorrect === 'boolean' || (attempt.practiceCorrect === null && attempt.practiceAnswer === ''))
+    && validEvaluation(attempt);
 }
 
 export function loadAttempts(): { attempts: Attempt[]; error: string | null } {
@@ -48,4 +49,13 @@ export function saveAttempts(attempts: Attempt[]): boolean {
   } catch {
     return false;
   }
+}
+
+// Проверка шага создаёт запись; закрепление обновляет её, а повтор выбора — новую.
+export function upsertAttempt(attempts: Attempt[], attempt: Attempt): Attempt[] {
+  const index = attempts.findIndex(item => item.id === attempt.id);
+  const next = [...attempts];
+  if (index === -1) next.push(attempt);
+  else next[index] = attempt;
+  return next.slice(-100);
 }

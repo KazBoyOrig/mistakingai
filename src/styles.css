@@ -146,5 +146,17 @@ h3 { font-size: 15px; font-weight: 600; margin-top: 22px; }
 .hints-panel p { background: #f5f5e9; color: #6f714c; border-radius: 8px; padding: 11px 13px; margin-top: 10px; line-height: 1.8; font-size: 12px; }
 .correct-answer { font-size: 15px; color: #34583a; font-weight: 600; margin-top: 15px; }
 .result-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 18px; }
+.task-navigation { display: flex; gap: 8px; margin-top: 12px; }
+.task-navigation .hint-button { padding: 8px; font-size: 10px; }
+#solution-title { margin-bottom: 16px; }
+.attempt-outcomes { display: grid; gap: 10px; padding: 15px; margin: 15px 0; border: 1px solid #d5dfcc; border-radius: 9px; font-size: 12px; }
+.attempt-outcomes > div { display: flex; justify-content: space-between; gap: 20px; }
+.attempt-outcomes dt { color: #74806b; }
+.attempt-outcomes dd { margin: 0; text-align: right; font-weight: 600; }
+.attempt-history { padding: 18px; margin-top: 20px; border: 1px solid #dce2d3; border-radius: 12px; font-size: 12px; color: #596950; background: #fffefb; }
+.attempt-history summary { cursor: pointer; font-weight: 600; }
+.attempt-history ul { list-style: none; padding: 0; margin: 15px 0 0; }
+.attempt-history li { display: grid; gap: 3px; padding: 12px 0; border-top: 1px solid #e4e9dc; }
+.attempt-history time { font-size: 10px; color: #828b7b; margin-bottom: 4px; }
 @media (max-width: 760px) { .exercise-picker { margin-bottom: 20px; } .exercise-picker select { font-size: 12px; padding: 12px; } }
 @media (max-width: 480px) { .card-meta { align-items: flex-start; } .card-meta > span:last-child { flex-shrink: 0; } .result-actions .hint-button { width: 100%; justify-content: center; } }
