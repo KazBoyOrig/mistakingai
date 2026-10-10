@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import type { Attempt, Exercise, PracticeResult, Review } from '../shared/types.ts';
+import type { Attempt, Exercise, Health, PracticeResult, Review } from '../shared/types.ts';
 import { request } from './api.ts';
 import { loadAttempts, saveAttempts } from './storage.ts';
 
 const stages = ['Найди ошибку', 'Объясни своими словами', 'Закрепи понимание'];
+const assessmentLabels = { correct: 'Объяснение верное', partial: 'Объяснение частично верное', incorrect: 'Объяснение требует уточнения', not_evaluated: 'Объяснение не оценено' };
 
 function attemptWord(count: number) {
   if (count % 100 >= 11 && count % 100 <= 14) return 'попыток';
@@ -29,10 +30,12 @@ export default function App() {
   const [progress, setProgress] = useState(loadAttempts);
   const [saved, setSaved] = useState(false);
   const [loadVersion, setLoadVersion] = useState(0);
+  const [explanationMode, setExplanationMode] = useState<Health['mode'] | null>(null);
   const reviewHeading = useRef<HTMLHeadingElement>(null);
   const resultHeading = useRef<HTMLHeadingElement>(null);
   const submitting = useRef(false);
   const successfulAttempts = progress.attempts.filter(attempt => attempt.selectedStepCorrect && attempt.practiceCorrect).length;
+  const understoodAttempts = progress.attempts.filter(attempt => attempt.selectedStepCorrect && attempt.practiceCorrect && attempt.explanationAssessment === 'correct').length;
   const attemptedIds = new Set(progress.attempts.map(attempt => attempt.exerciseId));
 
   useEffect(() => {
@@ -40,15 +43,16 @@ export default function App() {
     request<Exercise[]>('/api/exercises')
       .then(data => { if (active) setExercises(data); })
       .catch(() => { if (active) setError('Не удалось загрузить задачу. Проверь, что сервер запущен, и попробуй снова.'); });
+    request<Health>('/api/health').then(data => { if (active) setExplanationMode(data.mode); }).catch(() => { if (active) setExplanationMode(null); });
     return () => { active = false; };
   }, [loadVersion]);
 
   useEffect(() => { if (review) reviewHeading.current?.focus(); }, [review]);
   useEffect(() => { if (practiceResult) resultHeading.current?.focus(); }, [practiceResult]);
 
-  async function submitExplanation(event: FormEvent) {
-    event.preventDefault();
-    if (!exercise || selectedStep === null || submitting.current) return;
+  async function submitExplanation(event?: FormEvent) {
+    event?.preventDefault();
+    if (!exercise || selectedStep === null || submitting.current || practiceResult) return;
     submitting.current = true;
     setBusy(true);
     setError(null);
@@ -73,7 +77,9 @@ export default function App() {
       const attempt: Attempt = {
         id: crypto.randomUUID(), exerciseId: exercise.id, createdAt: new Date().toISOString(),
         selectedStep, explanation: explanation.trim(), selectedStepCorrect: review.selectedStepCorrect,
-        explanationAssessment: 'not_evaluated', practiceAnswer: answer.trim(), practiceCorrect: result.correct,
+        explanationAssessment: review.explanationAssessment, explanationFeedback: review.explanationFeedback,
+        rubricResults: review.rubricResults, explanationIssue: review.explanationIssue,
+        practiceAnswer: answer.trim(), practiceCorrect: result.correct,
       };
       const attempts = [...progress.attempts, attempt].slice(-100);
       const stored = saveAttempts(attempts);
@@ -158,6 +164,7 @@ export default function App() {
               <span className="small-label">Твой прогресс</span>
               <div className="progress-count">{progress.attempts.length}<span>{attemptWord(progress.attempts.length)}</span></div>
               <p>{successfulAttempts} с верным шагом и ответом</p>
+              <p>{understoodAttempts} с верным объяснением, шагом и ответом</p>
               <span className="local-note">Сохраняется в этом браузере</span>
             </div>
             <div className="sidebar-note"><span aria-hidden="true">↳</span><p>Важен ход мысли.<br />Объясняй так, как объяснил бы другу.</p></div>
@@ -197,15 +204,21 @@ export default function App() {
                     <textarea id="explanation" rows={4} placeholder="Я думаю, ошибка в этом шаге, потому что…" value={explanation} onChange={event => setExplanation(event.target.value)} minLength={10} maxLength={2000} required disabled={!!review || busy} aria-describedby="explanation-help" />
                     <div className="field-help" id="explanation-help"><span>От 10 символов. Формулы необязательны.</span><span>{explanation.length} / 2000</span></div>
                   </div>
-                  {!review && <div className="form-footer"><p>Можно ошибаться.<br />Для этого мы и тренируемся.</p><button className="primary-button" disabled={busy || selectedStep === null || explanation.trim().length < 10}>{busy ? 'Проверяем…' : 'Проверить шаг и открыть разбор'}<span aria-hidden="true">→</span></button></div>}
+                  {!review && <div className="form-footer"><p>Можно ошибаться.<br />Для этого мы и тренируемся.</p><button className="primary-button" disabled={busy || selectedStep === null || explanation.trim().length < 10}>{busy ? 'Проверяем объяснение…' : 'Проверить и открыть разбор'}<span aria-hidden="true">→</span></button></div>}
                 </form>
-                <p className="demo-notice">Деморежим: шаг проверяется кодом. Смысл объяснения пока не оценивается ИИ.</p>
+                <p className="demo-notice">{explanationMode === 'model' ? 'ИИ сверяет объяснение с проверенным эталоном. Твоё объяснение отправляется на проверку после нажатия кнопки.' : explanationMode === 'reference_only' ? 'Проверка объяснений пока не подключена. Сравни своё объяснение с эталоном после отправки.' : 'После отправки увидишь результат проверки и проверенный разбор.'}</p>
               </article>
 
               {review && <section className="review-card" aria-labelledby="review-title">
                 <p className="eyebrow">Разбираемся вместе</p>
                 <h2 ref={reviewHeading} tabIndex={-1} id="review-title">{review.selectedStepCorrect ? 'Ошибка найдена!' : 'Посмотрим внимательнее'}</h2>
                 <p className="review-feedback">{review.feedback}</p>
+                <div className={`explanation-assessment assessment-${review.explanationAssessment}`} aria-live="polite">
+                  <h3>{assessmentLabels[review.explanationAssessment]}</h3>
+                  <p>{review.explanationFeedback}</p>
+                  {review.rubricResults.length > 0 && <ul>{review.rubricResults.map(result => <li key={result.criterion}><strong>{result.met ? '✓ Раскрыто' : 'Уточни'}: {result.criterion}</strong><span>{result.evidence}</span></li>)}</ul>}
+                  {review.explanationAssessment === 'not_evaluated' && review.explanationIssue !== 'not_configured' && !practiceResult && <button type="button" className="hint-button" disabled={busy} onClick={() => void submitExplanation()}>{busy ? 'Повторно проверяем…' : 'Повторить проверку объяснения'}</button>}
+                </div>
                 <div className="reference-explanation">{review.referenceExplanation}</div>
                 <h3>Правильное решение</h3>
                 <ol className="correct-steps">{review.correctSteps.map(step => <li key={step}>{step}</li>)}</ol>
@@ -234,7 +247,7 @@ export default function App() {
           </section>
         </div>
 
-        <details className="how-it-works" id="how-it-works"><summary>Почему мы учим ошибающегося ИИ?</summary><p>Чтобы объяснить чужую ошибку, нужно разобраться в принципе самому. Сначала найди первый неверный шаг, затем объясни причину и реши похожую задачу. Доступны 15 проверенных задач и по две подсказки к каждой. Проверка шага и числового ответа работает кодом; подключение языковой модели для оценки смысла объяснения — следующий этап. При смене задачи незавершённая форма сбрасывается, завершённые попытки сохраняются.</p></details>
+        <details className="how-it-works" id="how-it-works"><summary>Почему мы учим ошибающегося ИИ?</summary><p>Чтобы объяснить чужую ошибку, нужно разобраться в принципе самому. Сначала найди первый неверный шаг, затем объясни причину и реши похожую задачу. Доступны 15 проверенных задач и по две подсказки к каждой. ИИ оценивает объяснение по проверенному эталону, когда проверка подключена. Оценка объяснения и выбор шага проверяются отдельно. Если проверка недоступна, приложение сообщит об этом и покажет эталон. При смене задачи незавершённая форма сбрасывается, завершённые попытки сохраняются.</p></details>
       </main>
       <footer className="site-footer"><span>Меньше угадывания. Больше понимания.</span><span>Обучи ошибающегося ИИ · 2026</span></footer>
     </div>

@@ -5,7 +5,7 @@ export async function request<T>(path: string, body?: unknown): Promise<T> {
       method: body === undefined ? 'GET' : 'POST',
       headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(path === '/api/review' ? 25_000 : 10_000),
     });
   } catch {
     throw new Error('Сервер не ответил. Проверь соединение и попробуй ещё раз.');

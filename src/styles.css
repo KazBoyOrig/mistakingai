@@ -91,6 +91,15 @@ textarea:disabled { background: #f7f8f3; color: #697562; }
 .review-card { padding: 28px; margin-top: 20px; background: #eaf0e1; border: 1px solid #d4dfc8; border-radius: 16px; }
 .review-card .eyebrow, .practice-card .eyebrow { margin-bottom: 10px; }
 .review-feedback { margin: 12px 0 18px; font-size: 13px; color: #596950; }
+.explanation-assessment { padding: 16px 18px; margin-bottom: 18px; border: 1px solid #cbdac0; border-radius: 10px; background: #f6f8f0; font-size: 13px; line-height: 1.8; }
+.explanation-assessment h3 { margin: 0 0 8px; }
+.explanation-assessment ul { padding-left: 18px; margin: 14px 0 0; }
+.explanation-assessment li { margin-top: 9px; }
+.explanation-assessment li strong, .explanation-assessment li span { display: block; }
+.explanation-assessment li span { font-size: 12px; color: #65765f; }
+.explanation-assessment .hint-button { margin-top: 12px; }
+.assessment-partial, .assessment-not_evaluated { background: #fff9e9; border-color: #e5d7ae; }
+.assessment-incorrect { background: #fff3eb; border-color: #e8ccb6; }
 .reference-explanation { font-size: 14px; line-height: 1.8; color: #34583a; padding: 15px 18px; background: #f6f8f0; border-left: 3px solid #8aab6f; border-radius: 3px 9px 9px 3px; }
 h3 { font-size: 15px; font-weight: 600; margin-top: 22px; }
 .correct-steps { padding-left: 20px; font-size: 13px; line-height: 1.8; color: #53694a; }

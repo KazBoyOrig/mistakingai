@@ -1,6 +1,25 @@
 import type { Attempt } from '../shared/types.ts';
 
 const key = 'mistakingai.attempts.v1';
+const assessments = ['correct', 'partial', 'incorrect', 'not_evaluated'];
+const issues = ['not_configured', 'timeout', 'unavailable', 'invalid_response', 'refused', 'busy'];
+
+function validEvaluation(attempt: Record<string, unknown>): boolean {
+  if (!assessments.includes(attempt.explanationAssessment as string)) return false;
+  // Старые попытки без метаданных сохраняют честный статус «не оценено».
+  if (attempt.explanationFeedback === undefined && attempt.rubricResults === undefined && attempt.explanationIssue === undefined) {
+    return attempt.explanationAssessment === 'not_evaluated';
+  }
+  if (typeof attempt.explanationFeedback !== 'string' || !Array.isArray(attempt.rubricResults)) return false;
+  const notEvaluated = attempt.explanationAssessment === 'not_evaluated';
+  if (notEvaluated ? !issues.includes(attempt.explanationIssue as string) || attempt.rubricResults.length !== 0
+    : attempt.explanationIssue !== null || attempt.rubricResults.length === 0) return false;
+  return attempt.rubricResults.every((result: unknown) => {
+    if (typeof result !== 'object' || result === null) return false;
+    const criterion = result as Record<string, unknown>;
+    return typeof criterion.criterion === 'string' && typeof criterion.met === 'boolean' && typeof criterion.evidence === 'string';
+  });
+}
 
 function isAttempt(value: unknown): value is Attempt {
   if (typeof value !== 'object' || value === null) return false;
@@ -9,7 +28,7 @@ function isAttempt(value: unknown): value is Attempt {
     && typeof attempt.createdAt === 'string' && Number.isFinite(Date.parse(attempt.createdAt))
     && Number.isInteger(attempt.selectedStep) && typeof attempt.explanation === 'string'
     && typeof attempt.selectedStepCorrect === 'boolean' && typeof attempt.practiceAnswer === 'string'
-    && typeof attempt.practiceCorrect === 'boolean' && attempt.explanationAssessment === 'not_evaluated';
+    && typeof attempt.practiceCorrect === 'boolean' && validEvaluation(attempt);
 }
 
 export function loadAttempts(): { attempts: Attempt[]; error: string | null } {
