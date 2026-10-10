@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import type { GameSession } from '../shared/types.ts';
 
-const key = 'mistakingai.session.v1';
+export const sessionKey = 'mistakingai.session.v1';
+const key = sessionKey;
 const text = z.string().min(1);
 const stepNumber = z.number().int().min(1).max(5);
 const legacyReviewSchema = z.strictObject({
@@ -37,6 +38,7 @@ const sessionSchema = z.strictObject({
   review: reviewSchema.nullable(), solution: solutionSchema.nullable(), answer: z.string().max(100),
   practiceResult: z.strictObject({ correct: z.boolean(), expectedAnswer: z.number().finite().nonnegative(), explanation: text }).nullable(),
   activeAttemptId: text.nullable(),
+  clarificationQuestion: z.string().trim().min(1).max(240).nullable().optional(),
 }).superRefine((session, context) => {
   if (session.review && (session.selectedStep === null || !session.explanation.trim() || !session.activeAttemptId)
     || !session.review && (session.solution || session.practiceResult || session.activeAttemptId)

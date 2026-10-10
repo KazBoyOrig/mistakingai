@@ -1,6 +1,7 @@
 import type { Attempt } from '../shared/types.ts';
 
-const key = 'mistakingai.attempts.v1';
+export const attemptsKey = 'mistakingai.attempts.v1';
+const key = attemptsKey;
 const assessments = ['correct', 'partial', 'incorrect', 'unclear', 'not_evaluated'];
 const issues = ['not_configured', 'timeout', 'unavailable', 'invalid_response', 'refused', 'busy'];
 

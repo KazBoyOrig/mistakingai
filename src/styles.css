@@ -186,6 +186,13 @@ textarea:disabled { background: #f7f8f3; color: #55694b; }
 .attempt-history li { display: flex; flex-direction: column; gap: 4px; padding: 12px 0; border-top: 1px solid #dfe5da; font-size: 13px; }
 .attempt-history time { color: #65745e; font-size: 12px; }
 .progress-page { padding: 38px 0; }
+.progress-reset { margin: -12px 0 24px; }
+.progress-reset > .text-button { font-size: 13px; color: #765b2e; padding-left: 0; }
+.reset-confirmation { padding: 20px; border: 1px solid #e5d8b7; border-radius: 14px; background: #fff8e7; margin: 12px 0; }
+.reset-confirmation h2 { font-size: 20px; }
+.reset-confirmation p { margin: 10px 0 16px; font-size: 14px; color: #796039; }
+.clarification-question { padding: 14px 16px; border: 1px solid #dedbe9; border-radius: 12px; background: #f4f3f8; color: #514864; font-size: 15px; margin-bottom: 16px; }
+.clarification-question strong { display: block; font-size: 12px; margin-bottom: 5px; }
 .page-heading { display: flex; justify-content: space-between; align-items: center; gap: 24px; margin-bottom: 28px; }
 .page-heading p:not(.eyebrow) { color: #62735b; margin-top: 14px; font-size: 15px; }
 .progress-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-bottom: 30px; }

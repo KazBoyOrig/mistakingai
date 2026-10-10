@@ -6,6 +6,7 @@ import { loadAttempts, saveAttempts, upsertAttempt } from './storage.ts';
 import { loadSession, saveSession } from './session.ts';
 import Character from './Character.tsx';
 import Outcomes from './Outcomes.tsx';
+import { resetLocalProgress } from './reset-progress.ts';
 
 const stages = ['Найди ошибку', 'Объясни своими словами', 'Закрепи понимание'];
 const assessmentLabels = { correct: 'Объяснение верное', partial: 'Объяснение частично верное', incorrect: 'Объяснение неверное', unclear: 'Нужно уточнить смысл объяснения', not_evaluated: 'Объяснение не оценено' };
@@ -42,6 +43,9 @@ export default function App() {
   const [answer, setAnswer] = useState(initial?.answer ?? '');
   const [practiceResult, setPracticeResult] = useState<PracticeResult | null>(initial?.practiceResult ?? null);
   const [activeAttemptId, setActiveAttemptId] = useState<string | null>(initial?.activeAttemptId ?? null);
+  const [clarificationQuestion, setClarificationQuestion] = useState(initial?.clarificationQuestion ?? null);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [resetMessage, setResetMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(loadAttempts);
@@ -68,6 +72,7 @@ export default function App() {
   }, []);
   useEffect(() => {
     document.title = `${screen === 'welcome' ? 'Обучи ошибающегося ИИ' : screen === 'progress' ? 'Твой прогресс' : 'Тренировка'} · ошибка.`;
+    setConfirmReset(false);
     window.scrollTo({ top: 0 });
     document.getElementById('page-title')?.focus();
   }, [screen]);
@@ -89,10 +94,11 @@ export default function App() {
   useEffect(() => { if (practiceResult) resultHeading.current?.focus(); }, [practiceResult]);
 
   useEffect(() => {
-    if (!saveSession({ exerciseId, hintCount, selectedStep, explanation, review, solution, answer, practiceResult, activeAttemptId })) {
+    if (!saveSession({ exerciseId, hintCount, selectedStep, explanation, review, solution, answer, practiceResult, activeAttemptId, clarificationQuestion })) {
       setSessionError('Браузер не разрешил сохранить текущую задачу. После обновления страницы форма может сброситься.');
     }
-  }, [exerciseId, hintCount, selectedStep, explanation, review, solution, answer, practiceResult, activeAttemptId]);
+  }, [exerciseId, hintCount, selectedStep, explanation, review, solution, answer, practiceResult, activeAttemptId, clarificationQuestion]);
+  useEffect(() => { if (confirmReset) document.getElementById('reset-title')?.focus(); }, [confirmReset]);
 
   useEffect(() => {
     if (!exercises.length) return;
@@ -111,6 +117,7 @@ export default function App() {
   }, [exercises, exerciseId, selectedStep]);
 
   function recordAttempt(attempt: Attempt) {
+    setResetMessage(null);
     const attempts = upsertAttempt(progress.attempts, attempt);
     const stored = saveAttempts(attempts);
     setProgress({ attempts, error: stored ? null : 'Браузер не разрешил сохранить прогресс. Результат доступен только до закрытия страницы.' });
@@ -135,6 +142,7 @@ export default function App() {
       });
       setActiveAttemptId(id);
       setReview(result);
+      setClarificationQuestion(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Не удалось отправить объяснение. Попробуй ещё раз.');
     } finally {
@@ -191,12 +199,14 @@ export default function App() {
     setSaved(false);
     setHintCount(0);
     setActiveAttemptId(null);
+    setClarificationQuestion(null);
     setSessionError(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function tryAgain() {
     if (busy) return;
+    setClarificationQuestion(review?.followUpQuestion ?? null);
     if (!review?.selectedStepCorrect) setSelectedStep(null);
     setReview(null);
     setSolution(null);
@@ -220,6 +230,23 @@ export default function App() {
   function navigate(next: Screen) {
     window.location.hash = next === 'welcome' ? '#welcome' : `#${next}`;
     setScreen(next);
+  }
+
+  function clearProgress() {
+    if (submitting.current || !confirmReset) return;
+    setConfirmReset(false);
+    if (!resetLocalProgress()) {
+      setResetMessage('Не удалось завершить сброс в хранилище. Данные на экране сохранены; после обновления их доступность может измениться.');
+      return;
+    }
+    reset();
+    setExerciseId(exercises[0]?.id ?? 'discount-then-markup-01');
+    setDemoExerciseId(exercises[0]?.id ?? 'discount-then-markup-01');
+    setProgress({ attempts: [], error: null });
+    const url = new URL(window.location.href);
+    url.searchParams.delete('demo');
+    window.history.replaceState(null, '', url);
+    setResetMessage('Прогресс и текущая попытка сброшены в этом браузере. Можно начать заново.');
   }
 
   function startDemo() {
@@ -277,6 +304,10 @@ export default function App() {
           <div className="page-heading"><div><p className="eyebrow">Маленькие шаги к пониманию</p><h1 id="page-title" tabIndex={-1}>Твой прогресс<span>.</span></h1><p>Три результата каждой попытки. Сохраняются в этом браузере.</p></div><button type="button" className="primary-button" disabled={busy || !exercise} onClick={() => navigate('training')}>К тренировке<span aria-hidden="true">→</span></button></div>
           {progress.error && <p className="storage-warning" role="status">{progress.error}</p>}
           <div className="progress-stats"><div><strong>{solvedIds.size}<span> / {exercises.length || 15}</span></strong><p>Задач с верным закреплением</p></div><div><strong>{progress.attempts.length}</strong><p>{attemptWord(progress.attempts.length)} в истории</p></div><div><strong>{progress.attempts.filter(item => item.explanationAssessment === 'correct').length}</strong><p>Верных объяснений</p></div></div>
+          <div className="progress-reset"><button type="button" className="text-button" disabled={busy} onClick={() => { setResetMessage(null); setConfirmReset(true); }}>Сбросить прогресс</button>
+            {confirmReset && <div className="reset-confirmation" role="group" aria-labelledby="reset-title"><h2 id="reset-title" tabIndex={-1}>Удалить историю и текущую попытку?</h2><p>Результаты всех задач в этом браузере будут удалены. Отменить сброс нельзя.</p><div className="result-actions"><button type="button" className="primary-button" disabled={busy} onClick={clearProgress}>Да, сбросить прогресс</button><button type="button" className="hint-button" onClick={() => setConfirmReset(false)}>Отмена</button></div></div>}
+            {resetMessage && <p className="storage-warning" role="status">{resetMessage}</p>}
+          </div>
           {!progress.attempts.length && <div className="empty-progress"><Character small /><div><h2>Первая ошибка — начало прогресса</h2><p>Реши задачу: здесь появятся твой выбор шага, оценка объяснения и ответ закрепления.</p></div></div>}
           <div className="progress-list-heading"><h2>Все задачи</h2><span>Показана последняя попытка каждой задачи</span></div>
           <div className="progress-exercises">{exercises.map((item, index) => {
@@ -354,8 +385,9 @@ export default function App() {
                     <div aria-live="polite">{exercise.hints.slice(0, hintCount).map((hint, index) => <p key={hint}><strong>Подсказка {index + 1}.</strong> {hint}</p>)}</div>
                   </div>}
                   <div className="explanation-field">
+                    {clarificationQuestion && <p className="clarification-question" id="clarification-question"><strong>Уточняющий вопрос ИИ</strong>{clarificationQuestion}</p>}
                     <label htmlFor="explanation">Почему этот шаг неверен?<span>Объясни своими словами</span></label>
-                    <textarea id="explanation" rows={4} placeholder="Я думаю, ошибка в этом шаге, потому что…" value={explanation} onChange={event => setExplanation(event.target.value)} maxLength={2000} required disabled={!!review || busy} aria-describedby="explanation-help" />
+                    <textarea id="explanation" rows={4} placeholder="Я думаю, ошибка в этом шаге, потому что…" value={explanation} onChange={event => setExplanation(event.target.value)} maxLength={2000} required disabled={!!review || busy} aria-describedby={`explanation-help${clarificationQuestion ? ' clarification-question' : ''}`} />
                     <div className="field-help" id="explanation-help"><span>Короткий ответ допустим. Формулы необязательны.</span><span>{explanation.length} / 2000</span></div>
                   </div>
                   {!review && <div className="form-footer"><p>Можно ошибаться.<br />Для этого мы и тренируемся.</p><button className="primary-button" disabled={busy || selectedStep === null || !explanation.trim()}>{busy ? 'Проверяем объяснение…' : 'Проверить шаг и объяснение'}<span aria-hidden="true">→</span></button></div>}
