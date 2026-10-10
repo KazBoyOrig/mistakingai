@@ -27,8 +27,11 @@ export interface Health {
 
 export interface Review extends ExplanationEvaluation {
   selectedStepCorrect: boolean;
-  firstWrongStep: number;
   feedback: string;
+}
+
+export interface Solution {
+  firstWrongStep: number;
   referenceExplanation: string;
   correctSteps: string[];
   correctAnswer: number;
@@ -54,5 +57,17 @@ export interface Attempt {
   rubricResults?: RubricResult[];
   explanationIssue?: ExplanationIssue | null;
   practiceAnswer: string;
-  practiceCorrect: boolean;
+  practiceCorrect: boolean | null;
+}
+
+export interface GameSession {
+  exerciseId: string;
+  hintCount: number;
+  selectedStep: number | null;
+  explanation: string;
+  review: Review | null;
+  solution: Solution | null;
+  answer: string;
+  practiceResult: PracticeResult | null;
+  activeAttemptId: string | null;
 }
