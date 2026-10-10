@@ -6,7 +6,7 @@ import { loadAttempts, saveAttempts, upsertAttempt } from './storage.ts';
 import { loadSession, saveSession } from './session.ts';
 
 const stages = ['Найди ошибку', 'Объясни своими словами', 'Закрепи понимание'];
-const assessmentLabels = { correct: 'Объяснение верное', partial: 'Объяснение частично верное', incorrect: 'Объяснение требует уточнения', not_evaluated: 'Объяснение не оценено' };
+const assessmentLabels = { correct: 'Объяснение верное', partial: 'Объяснение частично верное', incorrect: 'Объяснение неверное', unclear: 'Нужно уточнить смысл объяснения', not_evaluated: 'Объяснение не оценено' };
 
 function attemptWord(count: number) {
   if (count % 100 >= 11 && count % 100 <= 14) return 'попыток';
@@ -35,7 +35,7 @@ export default function App() {
   const [progress, setProgress] = useState(loadAttempts);
   const [saved, setSaved] = useState(() => !!initial?.activeAttemptId && progress.attempts.some(attempt => attempt.id === initial.activeAttemptId
     && attempt.selectedStep === initial.selectedStep && attempt.explanation === initial.explanation.trim()
-    && attempt.explanationAssessment === initial.review?.explanationAssessment
+    && attempt.explanationAssessment === (initial.review?.verdict ?? 'not_evaluated')
     && attempt.practiceCorrect === (initial.practiceResult?.correct ?? null)
     && attempt.practiceAnswer === (initial.practiceResult ? initial.answer.trim() : '')));
   const [sessionError, setSessionError] = useState(restored.error);
@@ -101,8 +101,8 @@ export default function App() {
       recordAttempt({
         id, exerciseId: exercise.id, createdAt: progress.attempts.find(attempt => attempt.id === id)?.createdAt ?? new Date().toISOString(),
         selectedStep, explanation: explanation.trim(), selectedStepCorrect: result.selectedStepCorrect,
-        explanationAssessment: result.explanationAssessment, explanationFeedback: result.explanationFeedback,
-        rubricResults: result.rubricResults, explanationIssue: result.explanationIssue,
+        explanationAssessment: result.verdict ?? 'not_evaluated', explanationFeedback: result.feedback,
+        followUpQuestion: result.followUpQuestion, explanationIssue: result.explanationIssue,
         practiceAnswer: '', practiceCorrect: null,
       });
       setActiveAttemptId(id);
@@ -137,8 +137,8 @@ export default function App() {
       const attempt: Attempt = {
         id, exerciseId: exercise.id, createdAt: progress.attempts.find(item => item.id === id)?.createdAt ?? new Date().toISOString(),
         selectedStep, explanation: explanation.trim(), selectedStepCorrect: review.selectedStepCorrect,
-        explanationAssessment: review.explanationAssessment, explanationFeedback: review.explanationFeedback,
-        rubricResults: review.rubricResults, explanationIssue: review.explanationIssue,
+        explanationAssessment: review.verdict ?? 'not_evaluated', explanationFeedback: review.feedback,
+        followUpQuestion: review.followUpQuestion, explanationIssue: review.explanationIssue,
         practiceAnswer: answer.trim(), practiceCorrect: result.correct,
       };
       recordAttempt(attempt);
@@ -280,10 +280,10 @@ export default function App() {
                   </div>}
                   <div className="explanation-field">
                     <label htmlFor="explanation">В чём ошибка?<span>Объясни своими словами</span></label>
-                    <textarea id="explanation" rows={4} placeholder="Я думаю, ошибка в этом шаге, потому что…" value={explanation} onChange={event => setExplanation(event.target.value)} minLength={10} maxLength={2000} required disabled={!!review || busy} aria-describedby="explanation-help" />
-                    <div className="field-help" id="explanation-help"><span>От 10 символов. Формулы необязательны.</span><span>{explanation.length} / 2000</span></div>
+                    <textarea id="explanation" rows={4} placeholder="Я думаю, ошибка в этом шаге, потому что…" value={explanation} onChange={event => setExplanation(event.target.value)} maxLength={2000} required disabled={!!review || busy} aria-describedby="explanation-help" />
+                    <div className="field-help" id="explanation-help"><span>Короткий ответ допустим. Формулы необязательны.</span><span>{explanation.length} / 2000</span></div>
                   </div>
-                  {!review && <div className="form-footer"><p>Можно ошибаться.<br />Для этого мы и тренируемся.</p><button className="primary-button" disabled={busy || selectedStep === null || explanation.trim().length < 10}>{busy ? 'Проверяем объяснение…' : 'Проверить шаг и объяснение'}<span aria-hidden="true">→</span></button></div>}
+                  {!review && <div className="form-footer"><p>Можно ошибаться.<br />Для этого мы и тренируемся.</p><button className="primary-button" disabled={busy || selectedStep === null || !explanation.trim()}>{busy ? 'Проверяем объяснение…' : 'Проверить шаг и объяснение'}<span aria-hidden="true">→</span></button></div>}
                 </form>
                 <p className="demo-notice">{explanationMode === 'model' ? 'ИИ сверяет объяснение с проверенным эталоном. Твоё объяснение отправляется на проверку после нажатия кнопки.' : explanationMode === 'reference_only' ? 'Проверка объяснений пока не подключена. Сравни своё объяснение с эталоном, открыв разбор.' : 'После отправки увидишь обратную связь. Разбор можно открыть отдельно.'}</p>
               </article>
@@ -291,17 +291,17 @@ export default function App() {
               {review && <section className="review-card" aria-labelledby="review-title">
                 <p className="eyebrow">Разбираемся вместе</p>
                 <h2 ref={reviewHeading} tabIndex={-1} id="review-title">{review.selectedStepCorrect ? 'Ошибка найдена!' : 'Посмотрим внимательнее'}</h2>
-                <p className="review-feedback">{review.feedback}</p>
-                <div className={`explanation-assessment assessment-${review.explanationAssessment}`} aria-live="polite">
-                  <h3>{assessmentLabels[review.explanationAssessment]}</h3>
-                  <p>{review.explanationFeedback}</p>
-                  {review.rubricResults.length > 0 && <ul>{review.rubricResults.map(result => <li key={result.criterion}><strong>{result.met ? '✓ Раскрыто' : 'Уточни'}: {result.criterion}</strong><span>{result.evidence}</span></li>)}</ul>}
-                  {review.explanationAssessment === 'not_evaluated' && review.explanationIssue !== 'not_configured' && !practiceResult && <button type="button" className="hint-button" disabled={busy} onClick={() => void submitExplanation()}>{busy ? 'Повторно проверяем…' : 'Повторить проверку объяснения'}</button>}
+                <p className="review-feedback">{review.stepFeedback}</p>
+                <div className={`explanation-assessment assessment-${review.verdict ?? 'not_evaluated'}`} aria-live="polite">
+                  <h3>{assessmentLabels[review.verdict ?? 'not_evaluated']}</h3>
+                  <p>{review.feedback}</p>
+                  {review.followUpQuestion && <p className="follow-up-question"><strong>Уточняющий вопрос:</strong> {review.followUpQuestion}</p>}
+                  {['partial', 'unclear', 'incorrect'].includes(review.verdict ?? '') && !practiceResult && <button type="button" className="hint-button" disabled={busy} onClick={tryAgain}>Уточнить объяснение</button>}
+                  {review.verdict === null && !practiceResult && <button type="button" className="hint-button" disabled={busy} onClick={() => void submitExplanation()}>{busy ? 'Повторно проверяем…' : 'Повторить проверку объяснения'}</button>}
                 </div>
                 {!solution && <>
                   <div className="result-actions">
                     {!review.selectedStepCorrect && <button type="button" className="primary-button" disabled={busy} onClick={tryAgain}>Попробовать снова<span aria-hidden="true">↻</span></button>}
-                    {review.selectedStepCorrect && ['partial', 'incorrect'].includes(review.explanationAssessment) && <button type="button" className="hint-button" disabled={busy} onClick={tryAgain}>Уточнить объяснение</button>}
                     {hintCount < 2 && <button type="button" className="hint-button" disabled={busy} onClick={() => setHintCount(count => Math.min(count + 1, 2))}>Открыть подсказку<span>{hintCount + 1} / 2</span></button>}
                     <button type="button" className="hint-button" disabled={busy} onClick={() => void openSolution()}>{busy ? 'Загружаем…' : 'Открыть правильный разбор'}<span aria-hidden="true">→</span></button>
                   </div>
@@ -335,7 +335,7 @@ export default function App() {
                   <p>{practiceResult.explanation}</p>
                   <dl className="attempt-outcomes">
                     <div><dt>Выбор шага</dt><dd>{review.selectedStepCorrect ? 'Верно' : 'Неверно'}</dd></div>
-                    <div><dt>Объяснение</dt><dd>{assessmentLabels[review.explanationAssessment]}</dd></div>
+                    <div><dt>Объяснение</dt><dd>{assessmentLabels[review.verdict ?? 'not_evaluated']}</dd></div>
                     <div><dt>Закрепление</dt><dd>{practiceResult.correct ? 'Верно' : 'Неверно'}</dd></div>
                   </dl>
                   <p className="saved-note">{saved ? '✓ Попытка сохранена в этом браузере' : 'Попытка не сохранена: локальное хранилище недоступно'}</p>

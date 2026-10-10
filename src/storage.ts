@@ -1,11 +1,19 @@
 import type { Attempt } from '../shared/types.ts';
 
 const key = 'mistakingai.attempts.v1';
-const assessments = ['correct', 'partial', 'incorrect', 'not_evaluated'];
+const assessments = ['correct', 'partial', 'incorrect', 'unclear', 'not_evaluated'];
 const issues = ['not_configured', 'timeout', 'unavailable', 'invalid_response', 'refused', 'busy'];
 
 function validEvaluation(attempt: Record<string, unknown>): boolean {
   if (!assessments.includes(attempt.explanationAssessment as string)) return false;
+  if (attempt.followUpQuestion !== undefined) {
+    const question = attempt.followUpQuestion;
+    const needsQuestion = attempt.explanationAssessment === 'partial' || attempt.explanationAssessment === 'unclear';
+    return typeof attempt.explanationFeedback === 'string' && attempt.explanationFeedback.trim().length > 0
+      && (attempt.explanationAssessment === 'not_evaluated' ? issues.includes(attempt.explanationIssue as string) : attempt.explanationIssue === null)
+      // Прежняя оценка partial могла быть сохранена до появления уточняющих вопросов.
+      && (needsQuestion ? question === null || typeof question === 'string' && question.trim().length > 0 : question === null);
+  }
   // Старые попытки без метаданных сохраняют честный статус «не оценено».
   if (attempt.explanationFeedback === undefined && attempt.rubricResults === undefined && attempt.explanationIssue === undefined) {
     return attempt.explanationAssessment === 'not_evaluated';

@@ -4,7 +4,7 @@ import type { GameSession } from '../shared/types.ts';
 const key = 'mistakingai.session.v1';
 const text = z.string().min(1);
 const stepNumber = z.number().int().min(1).max(5);
-const reviewSchema = z.strictObject({
+const legacyReviewSchema = z.strictObject({
   selectedStepCorrect: z.boolean(), feedback: text,
   explanationAssessment: z.enum(['correct', 'partial', 'incorrect', 'not_evaluated']),
   explanationFeedback: text,
@@ -13,6 +13,19 @@ const reviewSchema = z.strictObject({
 }).refine(review => review.explanationAssessment === 'not_evaluated'
   ? review.explanationIssue !== null && review.rubricResults.length === 0
   : review.explanationIssue === null && review.rubricResults.length > 0);
+const reviewSchema = z.union([
+  z.strictObject({
+    selectedStepCorrect: z.boolean(), stepFeedback: text,
+    verdict: z.enum(['correct', 'partial', 'incorrect', 'unclear']).nullable(),
+    feedback: text, followUpQuestion: text.nullable(),
+    explanationIssue: z.enum(['not_configured', 'timeout', 'unavailable', 'invalid_response', 'refused', 'busy']).nullable(),
+  }).refine(review => review.verdict === null ? review.explanationIssue !== null && review.followUpQuestion === null : review.explanationIssue === null),
+  legacyReviewSchema.transform(review => ({
+    selectedStepCorrect: review.selectedStepCorrect, stepFeedback: review.feedback,
+    verdict: review.explanationAssessment === 'not_evaluated' ? null : review.explanationAssessment,
+    feedback: review.explanationFeedback, followUpQuestion: null, explanationIssue: review.explanationIssue,
+  })),
+]);
 const solutionSchema = z.strictObject({
   firstWrongStep: stepNumber, referenceExplanation: text, correctSteps: z.array(text).min(3).max(5),
   correctAnswer: z.number().finite().nonnegative(), answerUnit: z.enum(['₽', '%', 'п.п.']),
@@ -25,7 +38,7 @@ const sessionSchema = z.strictObject({
   practiceResult: z.strictObject({ correct: z.boolean(), expectedAnswer: z.number().finite().nonnegative(), explanation: text }).nullable(),
   activeAttemptId: text.nullable(),
 }).superRefine((session, context) => {
-  if (session.review && (session.selectedStep === null || session.explanation.trim().length < 10 || !session.activeAttemptId)
+  if (session.review && (session.selectedStep === null || !session.explanation.trim() || !session.activeAttemptId)
     || !session.review && (session.solution || session.practiceResult || session.activeAttemptId)
     || session.practiceResult && !session.solution) {
     context.addIssue({ code: 'custom', message: 'Несогласованные этапы попытки.' });
